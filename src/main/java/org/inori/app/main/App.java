@@ -1,12 +1,17 @@
 package org.inori.app.main;
 
 import org.inori.app.utils.HttpClientUtils;
+import org.inori.app.utils.JsoupHtmlUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -20,54 +25,60 @@ import java.util.List;
 public class App {
 
     private static final String MAVEN_CENTRAL_REPOSITORY_URL = "http://repo2.maven.org/maven2/";
+    private static final String TARGET_FILE = "maven-metadata.xml";
 
     public static void main(String[] args) {
-        //String text = HttpClientUtils.doGet(MAVEN_CENTRAL_REPOSITORY_URL);
-        //System.out.println(text);
 
         try {
-            Document topDoc = Jsoup.connect(MAVEN_CENTRAL_REPOSITORY_URL).get();
+            Document topDoc = Jsoup.connect(MAVEN_CENTRAL_REPOSITORY_URL).timeout(100000).get();
             Elements aTags = topDoc.getElementsByTag("a");
 
-            int size = aTags.size();
-            System.out.println(size);
-
-            /**
-             * 读取一级目录
-             */
-            List<String> firstGroupIdList = new LinkedList<String>();
-            List<String> xmlList = new LinkedList<String>();
-            List<String> txtList = new LinkedList<String>();
-            for (Element aTag : aTags) {
-                if (aTag.hasText()) {
-                    String text = aTag.text();
-
+            List<String> topList = new LinkedList<String>();
+            if (! JsoupHtmlUtils.hasTargetFile(aTags, TARGET_FILE)) {
+                for (String text : aTags.eachText()) {
                     if (! text.equals("../") && text.endsWith("/")) {
-                        firstGroupIdList.add(text);
-                    }
-
-                    if (text.endsWith(".xml")) {
-                        xmlList.add(text);
-                    }
-
-                    if (text.endsWith(".txt")) {
-                        txtList.add(text);
+                        topList.add(text);
+                        System.out.println("---顶级目录添加一个元素---");
                     }
                 }
-
             }
 
-            for (String firstGroupId : firstGroupIdList) {
-                Document secondaryDoc = Jsoup.connect(MAVEN_CENTRAL_REPOSITORY_URL + firstGroupId).get();
+            getTarget4Next(topList);
 
-                Elements secTags = secondaryDoc.getElementsByTag("a");
-
-                for (Element secTag : secTags) {
-
-                }
+            BufferedWriter bw = new BufferedWriter(new FileWriter(new File("D:/temp.txt")));
+            for (String text : topList) {
+                bw.write(text);
+                bw.newLine();
             }
+
+            bw.flush();
+            bw.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private static void getTarget4Next(List<String> topList) throws IOException {
+        List<String> secondList = new LinkedList<String>();
+        for (String text : topList) {
+            System.out.println(text);
+            Document document = Jsoup.connect(MAVEN_CENTRAL_REPOSITORY_URL + text).timeout(1000000000).get();
+            Elements a = document.getElementsByTag("a");
+
+            if (! JsoupHtmlUtils.hasTargetFile(a, TARGET_FILE)) {
+                for (String aText : a.eachText()) {
+                    if (! aText.equals("../") && aText.endsWith("/")) {
+                        secondList.add(text + aText);
+                        System.out.println("---次级目录添加一个元素---");
+                    }
+                }
+            }
+        }
+
+        topList.clear();
+        topList.addAll(secondList);
+        secondList.clear();
+
+        getTarget4Next(topList);
     }
 }
