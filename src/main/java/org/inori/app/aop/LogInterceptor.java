@@ -14,7 +14,7 @@ import java.util.Calendar;
  */
 public class LogInterceptor implements MethodInterceptor {
 
-    private static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss:sss");
+    private static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss:SSS");
 
     private MultiOutputStream target;
 
@@ -28,7 +28,12 @@ public class LogInterceptor implements MethodInterceptor {
 
     @Override
     public Object intercept(Object obj, Method method, Object[] args, MethodProxy proxy) throws Throwable {
-        byte[] a = (sdf.format(Calendar.getInstance().getTime()) + "  ").getBytes("UTF-8");
+        String data = null;
+
+        synchronized (sdf) {
+            data = sdf.format(Calendar.getInstance().getTime());
+        }
+        byte[] a = (data + "  ").getBytes("UTF-8");
         if (args.length == 3 && ! args[2].equals(2)) {
             target.write(a);
         }

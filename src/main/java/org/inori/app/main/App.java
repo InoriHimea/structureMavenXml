@@ -1,6 +1,7 @@
 package org.inori.app.main;
 
 import org.inori.app.aop.LogInterceptor;
+import org.inori.app.save.InputFile;
 import org.inori.app.save.OutputFile;
 import org.inori.app.utils.JsoupHttpUtils;
 import org.inori.app.utils.MultiOutputStream;
@@ -59,6 +60,9 @@ public class App {
 
             System.out.println("程序执行开始");
 
+            //先读取文件
+            inputFile2Collection();
+
             //搜索顶级元素
             getTopElementsList();
 
@@ -66,7 +70,7 @@ public class App {
             getTarget4Next();
 
             //把所有list存入文件
-            outputAllList2File();
+            outputCollection2File();
         } catch (IOException e) {
             e.printStackTrace();
             System.out.println("出现异常");
@@ -75,7 +79,7 @@ public class App {
             System.out.println("异常原因：" + e.getCause());
 
             //发生异常，将list中的内容写入文件中保存，以便下次继续执行
-            outputAllList2File();
+            outputCollection2File();
         } finally {
             long mainStop = System.currentTimeMillis();
             System.out.println("程序执行结束，使用时间：" + (mainStop - mainStart) + "ms");
@@ -92,19 +96,16 @@ public class App {
     }
 
     /**
-     * 将存储与list中的内容，写入文件
+     * 把文件内容输入到集合中并分配接下来需要执行的方法
      */
-    private static void outputAllList2File() {
-        long writeStart = System.currentTimeMillis();
-        System.out.println("开始多线程文件输出");
+    private static void inputFile2Collection() {
+        long readStart = System.currentTimeMillis();
+        System.out.println("开始多线程文件读取");
 
         CountDownLatch singleDown = new CountDownLatch(threadNum);
-        OutputFile outputFile = new OutputFile(singleDown, "parentList.txt", topElementsList);
-        OutputFile outputFile1 = new OutputFile(singleDown, "childrenList.txt", tempList);
-        OutputFile outputFile2 = new OutputFile(singleDown, "targetSet.txt", targetSet);
-        outputFile.start();
-        outputFile1.start();
-        outputFile2.start();
+        new InputFile(singleDown, "parentList.txt", topElementsList).start();
+        new InputFile(singleDown, "childrenList.txt", tempList).start();
+        new InputFile(singleDown, "targetSet.txt", targetSet).start();
 
         try {
             singleDown.await();
@@ -113,7 +114,33 @@ public class App {
 
             long countNo = singleDown.getCount();
             System.out.println("当前异常" + e.getLocalizedMessage());
-            System.out.println("线程" + countNo + "中断");
+            System.out.println("countNo:" + countNo);
+        } finally {
+            long readStop = System.currentTimeMillis();
+            System.out.println("所有文件读取完成，所消耗时间：" + (readStop - readStart) + "ms");
+        }
+    }
+
+    /**
+     * 将存储与list中的内容，写入文件
+     */
+    private static void outputCollection2File() {
+        long writeStart = System.currentTimeMillis();
+        System.out.println("开始多线程文件输出");
+
+        CountDownLatch singleDown = new CountDownLatch(threadNum);
+        new OutputFile(singleDown, "parentList.txt", topElementsList).start();
+        new OutputFile(singleDown, "childrenList.txt", tempList).start();
+        new OutputFile(singleDown, "targetSet.txt", targetSet).start();
+
+        try {
+            singleDown.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+
+            long countNo = singleDown.getCount();
+            System.out.println("当前异常" + e.getLocalizedMessage());
+            System.out.println("countNo:" + countNo);
         } finally {
             long writeStop = System.currentTimeMillis();
             System.out.println("所有文件写入完成，所消耗时间：" + (writeStop - writeStart) + "ms");
